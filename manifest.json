@@ -1,0 +1,30 @@
+{
+  "manifest_version": 3,
+  "name": "YourCuteHub 情緒價值小幫手",
+  "short_name": "YourCuteHub",
+  "version": "1.0.0",
+  "description": "一隻住在網頁角落的小可愛，隨時給你滿滿的情緒價值：誇誇你、陪你打氣、提醒你休息。",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_title": "YourCuteHub",
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png"
+    }
+  },
+  "permissions": ["storage", "activeTab"],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/settings.js", "src/messages.js", "src/content.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ]
+}

@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <title>YourCuteHub</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header>
+      <div class="avatar" id="avatar">🐱</div>
+      <div>
+        <h1>YourCuteHub</h1>
+        <p class="sub" id="stats">今天也要開開心心 ✨</p>
+      </div>
+      <label class="switch" title="開啟／關閉小可愛">
+        <input type="checkbox" id="enabled" />
+        <span></span>
+      </label>
+    </header>
+
+    <button class="cheer" id="cheer" type="button">💖 現在給我一點鼓勵</button>
+    <p class="hint" id="cheerHint"></p>
+
+    <section>
+      <label class="field">
+        <span>小可愛要怎麼叫你？</span>
+        <input type="text" id="nickname" maxlength="12" placeholder="寶貝" />
+      </label>
+
+      <div class="field">
+        <span>選一隻陪你的小可愛</span>
+        <div class="mascots" id="mascots" role="radiogroup" aria-label="小可愛"></div>
+      </div>
+
+      <label class="field row">
+        <span>主動鼓勵的頻率</span>
+        <select id="frequency">
+          <option value="5">每 5 分鐘</option>
+          <option value="15">每 15 分鐘</option>
+          <option value="30">每 30 分鐘</option>
+          <option value="60">每 1 小時</option>
+          <option value="0">不要主動說話</option>
+        </select>
+      </label>
+
+      <label class="field row">
+        <span>提醒我休息</span>
+        <select id="restReminder">
+          <option value="25">連續 25 分鐘</option>
+          <option value="50">連續 50 分鐘</option>
+          <option value="90">連續 90 分鐘</option>
+          <option value="0">不用提醒</option>
+        </select>
+      </label>
+
+      <label class="field row">
+        <span>出現在哪一邊</span>
+        <select id="position">
+          <option value="right">右下角</option>
+          <option value="left">左下角</option>
+        </select>
+      </label>
+
+      <label class="check">
+        <input type="checkbox" id="reactions" />
+        <span>對我的行為給回饋（打字、複製、送出表單、讀完文章）</span>
+      </label>
+      <label class="check">
+        <input type="checkbox" id="nightOwl" />
+        <span>深夜提醒我早點睡</span>
+      </label>
+      <label class="check" id="siteRow">
+        <input type="checkbox" id="siteDisabled" />
+        <span>不要在 <b id="siteName">這個網站</b> 出現</span>
+      </label>
+    </section>
+
+    <footer>設定會透過瀏覽器帳號雲端同步到你的其他裝置 ☁️</footer>
+
+    <script src="../src/settings.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>
