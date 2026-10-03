@@ -16,6 +16,8 @@
   let ui = null;
   let hideTimer = null;
   let tickTimer = null;
+  let proactiveTimer = null;
+  let proactiveEvery = 0;
   let dismissed = false; // 使用者在這個分頁按了 ×
   let typedCount = 0;
   let readDoneShown = false;
@@ -34,6 +36,7 @@
 
   function shutdown() {
     clearInterval(tickTimer);
+    clearInterval(proactiveTimer);
     unmount();
   }
 
@@ -91,14 +94,29 @@
 
   // ---------- 說話 ----------
 
-  async function say(category, { force = false, cooldown = REACTION_COOLDOWN } = {}) {
+  function intervalMs() {
+    return Math.max(1, Number(settings.interval) || CUTE_DEFAULTS.interval) * 1000;
+  }
+
+  function level() {
+    return Math.min(4, Math.max(1, Number(settings.level) || 2));
+  }
+
+  // 行為回饋的冷卻時間：預設 90 秒，但不會比使用者選的鼓勵頻率還長。
+  function reactionCooldown() {
+    return Math.min(REACTION_COOLDOWN, intervalMs());
+  }
+
+  async function say(category, { force = false, cooldown = reactionCooldown() } = {}) {
     if (!alive()) return shutdown(), false;
     if (!shouldShow() || !ui) return false;
     const now = Date.now();
     const { lastShownAt = 0, totalCount = 0 } = await local.get(["lastShownAt", "totalCount"]);
     if (!force && now - lastShownAt < cooldown) return false;
     await local.set({ lastShownAt: now, totalCount: totalCount + 1 });
-    showBubble(cutePick(category, settings.nickname));
+    showBubble(cutePick(category, settings.nickname, level()));
+    // 熱情以上的等級，每句話都附贈愛心。
+    if (level() >= 3 && category !== "click") burstHearts();
     return true;
   }
 
@@ -123,14 +141,16 @@
   function burstHearts() {
     if (!ui) return;
     const icons = ["💖", "💕", "✨", "🌸", "💗", "⭐"];
-    for (let i = 0; i < 8; i++) {
+    const count = [4, 8, 10, 16][level() - 1];
+    for (let i = 0; i < count; i++) {
       const s = document.createElement("span");
       s.className = "heart";
       s.textContent = icons[Math.floor(Math.random() * icons.length)];
-      s.style.setProperty("--dx", `${Math.round((Math.random() - 0.5) * 120)}px`);
-      s.style.setProperty("--dy", `${Math.round(-70 - Math.random() * 70)}px`);
+      const spread = level() === 4 ? 180 : 120;
+      s.style.setProperty("--dx", `${Math.round((Math.random() - 0.5) * spread)}px`);
+      s.style.setProperty("--dy", `${Math.round(-70 - Math.random() * (spread - 50))}px`);
       s.style.setProperty("--rot", `${Math.round((Math.random() - 0.5) * 60)}deg`);
-      s.style.animationDelay = `${i * 40}ms`;
+      s.style.animationDelay = `${i * 30}ms`;
       ui.hearts.appendChild(s);
       setTimeout(() => s.remove(), 1400);
     }
@@ -160,14 +180,14 @@
       pointer-events: auto;
       position: relative;
       max-width: 240px;
-      padding: 12px 16px;
-      border-radius: 18px;
-      background: #fff;
-      color: #5b3a4a;
+      padding: 10px 14px;
+      border-radius: 16px;
+      background: var(--bubble-bg, #fff);
+      color: var(--bubble-fg, #5b3a4a);
       font-size: 14px;
       line-height: 1.55;
       letter-spacing: 0.02em;
-      box-shadow: 0 8px 28px rgba(232, 104, 150, 0.28), 0 0 0 2px #ffd3e2;
+      box-shadow: 0 6px 24px rgba(91, 58, 74, 0.12);
       cursor: pointer;
       opacity: 0;
       transform: translateY(8px) scale(0.92);
@@ -184,11 +204,23 @@
       right: 26px;
       width: 14px;
       height: 14px;
-      background: #fff;
+      background: var(--bubble-tail, #fff);
       transform: rotate(45deg);
-      box-shadow: 2px 2px 0 0 #ffd3e2;
+      border-radius: 0 0 3px 0;
     }
     .left .bubble::after { right: auto; left: 26px; }
+
+    /* 等級外觀：溫柔 = 安靜素雅，爆表 = 粉紅閃亮 */
+    .lv-1 { --bubble-fg: #6b6470; }
+    .lv-1 .mascot { animation-duration: 5s; }
+    .lv-3 .bubble { font-weight: 500; }
+    .lv-4 {
+      --bubble-bg: linear-gradient(135deg, #fff0f6, #ffe0ee);
+      --bubble-tail: #ffe3ef;
+      --bubble-fg: #b03a6c;
+    }
+    .lv-4 .bubble { font-weight: 600; }
+    .lv-4 .mascot { animation-duration: 1.6s; }
 
     .mascot-box { position: relative; pointer-events: auto; }
     .mascot {
@@ -313,6 +345,7 @@
     const mascot = CUTE_MASCOTS[settings.mascot] || CUTE_MASCOTS.cat;
     ui.mascot.textContent = mascot.emoji;
     ui.mascot.title = `${mascot.name}：點我會有驚喜，可以拖曳移動`;
+    for (let i = 1; i <= 4; i++) ui.wrap.classList.toggle(`lv-${i}`, i === level());
     ui.wrap.classList.toggle("left", settings.position === "left");
     ui.wrap.classList.toggle("right", settings.position !== "left");
     const { bottomOffset } = await local.get("bottomOffset");
@@ -451,24 +484,41 @@
       if (await say("rest", { force: true })) activeMinutes = 0;
     } else if (settings.nightOwl && isLateNight() && now - (state.lastNightAt || 0) > 60 * 60 * 1000) {
       if (await say("night", { force: true })) await local.set({ lastNightAt: now });
-    } else if (settings.frequency > 0) {
-      const category = Math.random() < 0.3 ? timeCategory() : "encourage";
-      await say(category, { cooldown: settings.frequency * 60 * 1000 });
     }
 
     await local.set({ activeMinutes, lastActiveAt: now });
   }
 
+  // ---------- 主動鼓勵（依使用者選的頻率，最快每秒一次） ----------
+
+  async function proactiveTick() {
+    if (!alive()) return shutdown();
+    if (!shouldShow() || document.visibilityState !== "visible" || !document.hasFocus()) return;
+    const engaged = Date.now() - lastInteraction < IDLE_AFTER || mediaPlaying();
+    if (!engaged) return;
+    const category = Math.random() < 0.3 ? timeCategory() : "encourage";
+    // 計時器會有些微誤差，冷卻時間留一點寬限，避免剛好錯過。
+    await say(category, { cooldown: intervalMs() - Math.min(500, intervalMs() * 0.1) });
+  }
+
+  function scheduleProactive() {
+    const every = intervalMs();
+    if (every === proactiveEvery && proactiveTimer) return;
+    clearInterval(proactiveTimer);
+    proactiveEvery = every;
+    proactiveTimer = setInterval(proactiveTick, every);
+  }
+
   // 剛打開網頁時打聲招呼（受頻率限制，不會每頁都講話）。
   async function greet() {
-    if (!shouldShow() || settings.frequency <= 0) return;
+    if (!shouldShow()) return;
     const { lastActiveAt } = await local.get("lastActiveAt");
     if (lastActiveAt && Date.now() - lastActiveAt > WELCOME_BACK_AFTER) {
       await say("welcomeBack", { force: true });
       await local.set({ lastActiveAt: Date.now(), activeMinutes: 0 });
     } else {
       await say(isLateNight() && settings.nightOwl ? "night" : timeCategory(), {
-        cooldown: settings.frequency * 60 * 1000,
+        cooldown: Math.max(intervalMs(), 60 * 1000),
       });
     }
   }
@@ -476,6 +526,7 @@
   // ---------- 啟動 ----------
 
   function render() {
+    scheduleProactive();
     if (shouldShow()) {
       mount();
       applyAppearance();
@@ -501,7 +552,7 @@
         dismissed = false;
         render();
         say("encourage", { force: true }).then((shown) => {
-          if (shown) burstHearts();
+          if (shown && level() < 3) burstHearts();
           sendResponse({ shown });
         });
         return true;
